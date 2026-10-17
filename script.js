@@ -1,39 +1,29 @@
-
-document.addEventListener("DOMContentLoaded", () => {
-    // Automatically update the copyright year
-    const yearElement = document.getElementById("year");
-
-    if (yearElement) {
-        yearElement.textContent = new Date().getFullYear();
-    }
-
-    // Handle the contact form
-    const contactForm = document.getElementById("contact-form");
-    const formStatus = document.getElementById("form-status");
-
-    if (contactForm && formStatus) {
-        contactForm.addEventListener("submit", (event) => {
-            event.preventDefault();
-
-            const name = document.getElementById("visitor-name").value.trim();
-            const email = document.getElementById("visitor-email").value.trim();
-            const message = document.getElementById("visitor-message").value.trim();
-
-            if (!name || !email || !message) {
-                formStatus.textContent = "Please complete all fields.";
-                return;
-            }
-
-            const subject = encodeURIComponent("Message from Valtrix website");
-            const body = encodeURIComponent(
-                `Name: ${name}\nEmail: ${email}\n\nMessage:\n${message}`
-            );
-
-            formStatus.textContent =
-                "Opening your email app to prepare the message...";
-
-            window.location.href =
-                `mailto:?subject=${subject}&body=${body}`;
-        });
-    }
-});
+const KEY="valtrix_bm_v1";
+const initial={products:[{id:makeId(),name:"Business workflow setup",price:499,description:"Introductory setup service. Confirm exact scope before offering."}],sales:[]};
+function makeId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,8)}
+let db;try{db=JSON.parse(localStorage.getItem(KEY))||initial}catch(e){db=initial}
+const $=id=>document.getElementById(id);
+const money=n=>new Intl.NumberFormat("en-IN",{style:"currency",currency:"INR"}).format(Number(n)||0);
+const safe=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const date=s=>new Date(s).toLocaleDateString("en-IN",{day:"2-digit",month:"short",year:"numeric"});
+function save(){localStorage.setItem(KEY,JSON.stringify(db))}
+function toast(s){$("toast").textContent=s;$("toast").classList.add("show");setTimeout(()=>$("toast").classList.remove("show"),2400)}
+function go(id){document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id===id));document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("active",b.dataset.view===id));window.scrollTo(0,0);estimate()}
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>go(b.dataset.view));
+document.querySelectorAll("[data-goto]").forEach(b=>b.onclick=()=>go(b.dataset.goto));
+function renderProducts(){
+ $("product-list").innerHTML=db.products.length?db.products.map(p=>`<div class="product"><div><strong>${safe(p.name)}</strong><small>${safe(p.description||"No description")}</small><button class="mini" data-remove="${p.id}">Remove</button></div><div class="price">${money(p.price)}</div></div>`).join(""):'<div class="empty">No products yet. Add one using the form.</div>';
+ $("sale-product").innerHTML=db.products.length?db.products.map(p=>`<option value="${p.id}">${safe(p.name)} — ${money(p.price)}</option>`).join(""):'<option value="">Add a product first</option>';
+ document.querySelectorAll("[data-remove]").forEach(b=>b.onclick=()=>{if(confirm("Remove this catalogue item? Existing sale records will remain.")){db.products=db.products.filter(p=>p.id!==b.dataset.remove);save();render();toast("Item removed.")}});
+ estimate()
+}
+$("product-form").onsubmit=e=>{e.preventDefault();let name=$("p-name").value.trim(),price=Number($("p-price").value),description=$("p-desc").value.trim();if(!name||price<=0||!Number.isFinite(price))return toast("Enter a valid name and price.");db.products.push({id:makeId(),name,price,description});save();e.target.reset();render();toast("Product added.")};
+function estimate(){let p=db.products.find(p=>p.id===$("sale-product").value),q=Math.max(1,Number($("qty").value)||1),x=Math.max(0,Number($("extra").value)||0);$("estimate").textContent=money((p?p.price*q:0)+x)}
+["sale-product","qty","extra"].forEach(id=>$(id).addEventListener("input",estimate));
+$("sale-form").onsubmit=e=>{e.preventDefault();let p=db.products.find(p=>p.id===$("sale-product").value),customer=$("customer").value.trim(),qty=Number($("qty").value),extra=Number($("extra").value);if(!p)return toast("Add a product first.");if(!customer||!Number.isInteger(qty)||qty<1||extra<0)return toast("Check customer, quantity and charges.");let sale={id:makeId(),invoice:"VX-"+new Date().getFullYear()+"-"+Date.now().toString().slice(-6),date:new Date().toISOString(),customer,contact:$("contact").value.trim(),product:p.name,description:p.description,price:p.price,qty,subtotal:p.price*qty,extra,total:p.price*qty+extra,payment:$("payment").value,notes:$("notes").value.trim()};db.sales.unshift(sale);save();e.target.reset();$("qty").value=1;$("extra").value=0;render();go("invoices");toast("Invoice draft created. Review details before issuing.")};
+function renderRecent(){$("recent").innerHTML=db.sales.length?`<div class="tablewrap"><table><thead><tr><th>Invoice</th><th>Customer</th><th>Date</th><th>Total</th><th>Status</th></tr></thead><tbody>${db.sales.slice(0,5).map(s=>`<tr><td>${safe(s.invoice)}</td><td>${safe(s.customer)}</td><td>${date(s.date)}</td><td><strong>${money(s.total)}</strong></td><td><span class="status ${s.payment==="Paid"?"paid":""}">${safe(s.payment)}</span></td></tr>`).join("")}</tbody></table></div>`:'<div class="empty">No sales recorded. Add a real transaction when a customer order is agreed.</div>'}
+function invoiceHTML(s){return `<div style="max-width:800px;margin:auto;padding:28px;font:14px Arial;color:#222"><div style="text-align:center;border-bottom:2px solid #333;padding-bottom:18px"><div style="font-size:28px;font-weight:bold;letter-spacing:3px">VALTRIX</div><div style="font-size:12px;margin-top:5px">BUSINESS SOFTWARE & SERVICES</div><h1 style="margin:25px 0 8px">INVOICE</h1><div>${safe(s.invoice)} · ${date(s.date)}</div></div><div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:25px 0"><div><b>FROM / SELLER</b><p style="line-height:1.7">Valtrix<br>[Enter actual legal/business name]<br>[Enter actual address]<br>[Add applicable tax details, if any]</p></div><div><b>BILL TO / CUSTOMER</b><p style="line-height:1.7">${safe(s.customer)}<br>${safe(s.contact||"Contact not provided")}<br>[Add address if required]</p></div></div><table style="width:100%;border-collapse:collapse"><thead><tr><th style="border:1px solid #888;padding:10px">DESCRIPTION</th><th style="border:1px solid #888;padding:10px;text-align:right">PRICE</th><th style="border:1px solid #888;padding:10px;text-align:right">QTY</th><th style="border:1px solid #888;padding:10px;text-align:right">AMOUNT</th></tr></thead><tbody><tr><td style="border:1px solid #888;padding:10px">${safe(s.product)}<br><small>${safe(s.description)}</small></td><td style="border:1px solid #888;padding:10px;text-align:right">${money(s.price)}</td><td style="border:1px solid #888;padding:10px;text-align:right">${s.qty}</td><td style="border:1px solid #888;padding:10px;text-align:right">${money(s.subtotal)}</td></tr></tbody></table><div style="text-align:right;line-height:2;margin-top:16px">SUBTOTAL: ${money(s.subtotal)}<br>OTHER CHARGES: ${money(s.extra)}<br><b style="font-size:19px">GRAND TOTAL: ${money(s.total)}</b></div><p style="border-top:1px solid #aaa;margin-top:24px;padding-top:12px;line-height:1.6"><b>Payment status:</b> ${safe(s.payment)}<br>${s.notes?"<b>Notes:</b> "+safe(s.notes):""}<br><small>Confirm the transaction details and applicable tax requirements before issuing.</small></p><div style="text-align:center;border-top:1px solid #333;margin-top:25px;padding-top:18px;font-weight:bold">THANK YOU FOR YOUR BUSINESS</div></div>`}
+function printInvoice(id){let s=db.sales.find(x=>x.id===id);if(!s)return;let w=window.open("","_blank");if(!w)return toast("Allow pop-ups to print.");w.document.write(`<!doctype html><html><head><title>${safe(s.invoice)}</title><meta charset="utf-8"><style>body{padding:18px;font-family:Arial}@page{size:A4;margin:12mm}table{width:100%}</style></head><body>${invoiceHTML(s)}<script>window.onload=()=>window.print()<\/script></body></html>`);w.document.close()}
+function renderInvoices(){$("invoice-list").innerHTML=db.sales.length?db.sales.map(s=>`<div class="invoice-row"><div><b>${safe(s.invoice)} · ${safe(s.customer)}</b><small>${date(s.date)} · ${safe(s.product)} · ${money(s.total)}<br>Payment status: ${safe(s.payment)}</small></div><div><button class="mini" data-print="${s.id}">Preview / Print PDF</button> <button class="mini" data-delete="${s.id}">Delete local record</button></div></div>`).join(""):'<div class="empty">No invoice drafts yet. Record a real sale to create one.</div>';document.querySelectorAll("[data-print]").forEach(b=>b.onclick=()=>printInvoice(b.dataset.print));document.querySelectorAll("[data-delete]").forEach(b=>b.onclick=()=>{if(confirm("Delete this local record? This does not reverse a real transaction.")){db.sales=db.sales.filter(s=>s.id!==b.dataset.delete);save();render();toast("Record deleted.")}})}
+function render(){renderProducts();renderRecent();renderInvoices();$("total-sales").textContent=money(db.sales.reduce((a,s)=>a+s.total,0));$("sales-count").textContent=db.sales.length+" transaction(s)";$("product-count").textContent=db.products.length;$("invoice-count").textContent=db.sales.length}
+render();
